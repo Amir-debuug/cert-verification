@@ -1,0 +1,2665 @@
+openapi: 3.0.0
+info:
+  title: Tracifier Certification API
+  version: 1.1.0
+  description: >-
+    This RESTful API is for accessing the certification functionality of
+    Tracifier, such as registering and verifying accounts, and creating and
+    retrieving organizations, lots, certificates, and signing and verification of
+    certificates.
+
+
+    # Introduction
+
+    Welcome to tracifier!
+
+    - The tracifier API is designed around REST. JSON will be returned in 
+    almost all responses from the API, including errors but excluding binary
+    (PDF) files.
+
+    - Please configure your implementation to send its API requests to
+    `https://still.in.dev`
+
+
+    ## Getting started
+
+    Before you start sending API requests, you need to get an API key and
+    activate your application. API activation happens when you request an API
+    key by registering your application with us.  The steps below will guide you
+    through what you need to do to start sending API requests.
+
+    1. **Request an API key**. Send an email to `info@tracfier.com` detailing
+    why you want access to the API  and what kind of application will be
+    integrated.
+
+    2. **Receive an API key**. After your request has been approved you will
+    receive an API key.  This key need to be used when sending API requests.
+
+    3. **Use the API key in every request**. Besides personal authentication via
+    a bearer token,  you need to use received API key via HTTP header
+    `X-Tracifier-Client-Authentication` in every request.
+
+
+    ## Versioning
+
+    Developments in the food & agriculture sector, and new feature requests
+    require us to be flexible.  This means we can iterate quickly to improve the
+    API and related tooling. Therefore, we have chosen  not to attach any
+    version numbers to the changes just yet. We will inform you in a timely
+    manner of  any important changes we make before they are deployed. 
+
+
+    # Authentication
+
+    As mentioned before we multiple levels of autorization and authentication on
+    our API.
+
+    - All requests must use HTTPS. HTTP calls will fail.
+
+    - You should use SSL Certificate Pinning and Hostname Verification to ensure
+    your connection with  tracifier is secure.
+
+    - An auto logout time is set in the backend and applies to all your sessions
+    including the API ones.  If a request is made 30 minutes before a session
+    expires, the session will automatically be extended.
+
+    - We use extra signing on top of HTTPS encryption that you must implement
+    yourself using below instructions. 
+
+
+    ## API Signing Signature
+
+    To be able to securely authenticate, our APIs require you to send a digital
+    signature of the device.  This signature is a base64 encoded string of the
+    following format.
+
+    ```javacript
+
+    {
+      "uniqueId": "2644b25202d2561d6194078a6b50d339",
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 12_1 like Mac OS X)…",
+      "ipAddress": "89.20.162.146"
+    }
+
+    ```
+
+
+    | Item      | Description |
+
+    |-----------|-------------|
+
+    | uniqueId  | This is a unique identifier/fingerprint of user's device.  Use
+    [fingerprintjs](https://www.npmjs.com/package/@fingerprintjs/fingerprintjs)
+    or mobile app id |
+
+    | userAgent | The useragent of the application / browser |
+
+    | ipAddress | The IP address of the device |
+
+
+    For more details and in-app parsing see the signature schema
+    (#/components/schemas/signature).
+
+
+    This signature is send via HTTP header `X-Tracifier-Client-Signature` in
+    authentication requests.
+
+
+    ## Bearer Token
+
+    To login with a user account, which can be created by a organization itself of
+    directly by an admin:
+
+
+    1. Use the `POST /auth` resource to request a verification token.
+        - Needs the `X-Tracifier-Client-Signature` header and the account login details. 
+        - Sends verification code on email of phone
+
+    2. Use the `GET /auth/verify` resource to receive a authentication token.
+        - Needs the `X-Tracifier-Client-Signature` header for device recognition.
+        - Needs the `X-Tracifier-Client-Verification` header with received code.
+        - Returns JWT token of with user claims
+
+    3. Use the JWT token for bearer authentication where authentication is
+    required to perform request. 
+
+
+    If your application decodes the JWT token it contains de following
+    information:
+
+
+    |Claim|Example|Meaning|
+
+    |-----|-------|-------|
+
+    |iss|Tracifier|Issuer of JWT token|
+
+    |sub|241d137e7201fe1d94fca7b9ea021f3e3fe08933|Id of account|
+
+    |org|1a50672c16f80cbc9bc067102014b2a16103fdd9|Id of organization (optional)|
+
+    |dev|2644b25202d2561d6194078a6b50d339|Unique Id of device|
+
+    |role|internal|Role of the account|
+
+    |iat|1637869001|Token issued at|
+
+    |exp|1640461001|Token valid until|
+
+
+    # Errors
+
+    Familiar HTTP response codes are used to indicate the success or failure of
+    an API request.
+
+    Generally speaking, codes in the 2xx range indicate success, while codes in
+    the 4xx range indicate  an error having to do with provided information
+    (e.g. a required parameter was missing, invalid request, etc.).
+
+    Finally, codes in the 5xx range indicate an error with tracifier servers. If
+    this is the case, please stop by  the support and report it to us.
+
+
+    ## Response codes
+
+    |Code|Error Description|
+
+    |----|-----------------|
+
+    | 200 OK | Successful HTTP request |
+
+    | 201 CREATED | The object is successfully created |
+
+    | 204 NO CONTENT | The object is successfully updated or removed |
+
+    | 400 BAD REQUEST | Most likely a parameter is missing or invalid |
+
+    | 401 UNAUTHORISED | Token or signature provided is not valid |
+
+    | 403 FORBIDDEN | You're not allowed to make this call |
+
+    | 404 NOT FOUND | The object you're looking for cannot be found |
+
+    | 405 METHOD NOT ALLOWED | The method you are using is not allowed for this
+    endpoint |
+
+    | 422 UNPROCESSABLE ENTITY | Request object is invalid and cannot be
+    processed |
+
+    | 429 RATE LIMIT | Too many API calls have been made in a too short period |
+
+    | 500 INTERNAL SERVER ERROR | Something went wrong on tracifier's end |
+  termsOfService: 'https://tracifier.com/terms/'
+  contact:
+    email: info@tracifier.com
+    name: Tracifier API Team
+    url: 'https://tracifier.com'
+  license:
+    name: Licence usage - Apache 2.0
+    url: 'https://www.apache.cus/licenses/LICENSE-2.0.html'
+tags:
+  - name: Account Management
+    description: Resources in this group are related to account management.
+  - name: Organization Management
+    description: Resources in this group are related to organization management.
+  - name: Certificate Management
+    description: Resources in this group are related to certificate management.
+  - name: Verification Management
+    description: Resources in this group are related to signing and verification.
+  - name: Data management
+    description: Resources in this group are related to statistics and other
+security:
+  - apiKeyAuth: []
+servers:
+  - description: QA Environment
+    url: 'https://still.in.dev'
+paths:
+  /account-mgmt/accounts:
+    post:
+      tags:
+        - Account Management
+      summary: Create new guest account
+      description: >-
+        Provides registration capability for creating guest account to access
+        the verification application.
+      operationId: create-account
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/signatureParam'
+      requestBody:
+        $ref: '#/components/requestBodies/createAccountRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/createAccountResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  /account-mgmt/accounts/me:
+    get:
+      tags:
+        - Account Management
+      summary: Retrieve my account information
+      description: >-
+        Provides retrieval capability for returning user account information
+        that belongs to the current API user based on the value of the
+        authorization header
+      operationId: get-current-account
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/getAccountResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  /account-mgmt/auth:
+    post:
+      tags:
+        - Account Management
+      summary: Authenticate returning user
+      description: >-
+        Submit request for receiving new magic authentication code based on
+        given device/account information to get access to the application.
+      operationId: request-magiccode
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/signatureParam'
+      requestBody:
+        $ref: '#/components/requestBodies/magicCodeRequest'
+      responses:
+        '204':
+          description: Verification code send
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  /account-mgmt/auth/verify:
+    get:
+      tags:
+        - Account Management
+      summary: Verify authorization code to get token
+      description: >-
+        Provides autorization capability for returning accounts by creating a
+        new auth token based on given magic code  details to give user account
+        access to the application.
+      operationId: verify-magiccode
+      parameters:
+        - $ref: '#/components/parameters/signatureParam'
+        - $ref: '#/components/parameters/codeParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/authenticateResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  /organization-mgmt/organizations:
+    post:
+      tags:
+        - Organization Management
+      summary: Register new organization
+      description: >-
+        Provides registration capability for creating a new organization and
+        optional user accounts to access the organization-facing application.
+      operationId: create-organization
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/createOrganizationRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/createOrganizationResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    get:
+      tags:
+        - Organization Management
+      summary: Retrieve list of organizations
+      description: >-
+        Provides retrieval capability for returning list of organizations that
+        belongs to the current API user based on the value of the authorization
+        header
+      operationId: get-organizations
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/offsetParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/filterOnParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/getOrganizationsResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/organization-mgmt/organizations/{organizationId}':
+    get:
+      tags:
+        - Organization Management
+      summary: Retrieve organization details
+      description: >-
+        Provides retrieval capabitlity for returning a specific organization. API
+        user needs to be an internal admin or a member of the requested
+        organization.
+      operationId: get-organization
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/getOrganizationResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    put:
+      tags:
+        - Organization Management
+      summary: Update organization details
+      description: >-
+        Provide update capability for changing organization details. API user needs
+        to be an  internal admin or an admin member of the requested
+        organization.
+      operationId: update-organization
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/updateOrganizationRequest'
+      responses:
+        '204':
+          description: Successfully updated organization details
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    patch:
+      tags:
+        - Organization Management
+      summary: Update organization profile
+      description: >-
+        Provide update capability for changing profile picture and active
+        status. API user needs to be an internal admin or an admin member of the
+        requested organization.
+      operationId: patch-organization
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/patchOrganizationRequest'
+      responses:
+        '204':
+          description: Successfully updated organization details
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    delete:
+      tags:
+        - Organization Management
+      summary: Remove all organization data
+      description: >-
+        Provides removal capability of organization and associated accounts. This is
+        only possible when organization does not have any certificates assinged to
+        it, else disable organization only possible.
+      operationId: delete-organization
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+      responses:
+        '204':
+          description: Successful organization removal
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/organization-mgmt/organizations/{organizationId}/accounts':
+    post:
+      tags:
+        - Organization Management
+      summary: Add account to existing organization
+      description: >-
+        Provides registration capability for adding user accounts to organizations
+        to access the organization-facing application.
+      operationId: create-organization-account
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/createOrganizationAccountRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/createAccountResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    get:
+      tags:
+        - Organization Management
+      summary: Retrieve list of organization accounts
+      description: >-
+        Provides retrieval capability for returning list of organization accounts
+        that belongs to the current API user based on the value of the
+        authorization header
+      operationId: get-organization-accounts
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+        - $ref: '#/components/parameters/offsetParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/filterOnParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/getAccountsResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/organization-mgmt/organizations/{organizationId}/accounts/{accountId}':
+    put:
+      tags:
+        - Organization Management
+      summary: Update organization account details
+      description: >-
+        Provide update capability for changing account details. API user needs
+        to be an  internal admin or an admin member of the requested
+        organization.
+      operationId: update-account
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+        - $ref: '#/components/parameters/accountIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/updateAccountRequest'
+      responses:
+        '204':
+          description: Successfully updated account details
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    patch:
+      tags:
+        - Organization Management
+      summary: Update account status
+      description: >-
+        Provide update capability for changing account verified and active
+        status. API user needs to be an internal admin or an admin member of the
+        requested organization.
+      operationId: patch-account
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+        - $ref: '#/components/parameters/accountIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/patchAccountRequest'
+      responses:
+        '204':
+          description: Successfully updated account details
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    delete:
+      tags:
+        - Organization Management
+      summary: Remove account from existing organization
+      description: >-
+        Provides removal capability of user accounts from organization and the
+        access to the organization-facing application.
+      operationId: delete-organization-account
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/organizationIdParam'
+        - $ref: '#/components/parameters/accountIdParam'
+      responses:
+        '204':
+          description: Successful account removal
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  /certificate-mgmt/certificates:
+    post:
+      tags:
+        - Certificate Management
+      summary: Register new certificate
+      description: >-
+        Provides registration capability for creating a new certificate for a
+        registered organization.
+      operationId: create-certificate
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/createCertificateRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/createCertificateResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    get:
+      tags:
+        - Certificate Management
+      summary: Retrieve list of certificates
+      description: >-
+        Provides retrieval capability for returning list of certificates that
+        belongs to the current API user based on the value of the authorization
+        header.
+      operationId: get-certificates
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/offsetParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/sortByParam'
+        - $ref: '#/components/parameters/filterOnParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/getCertificatesResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/certificate-mgmt/certificates/{certificateId}':
+    get:
+      tags:
+        - Certificate Management
+      summary: Retrieve certificate details
+      description: Provides retrieval capability for returning a certificate.
+      operationId: get-certificate
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/getCertificateResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    put:
+      tags:
+        - Certificate Management
+      summary: Update certificate details
+      description: Provides update capability for changing certificate details.
+      operationId: update-certificate
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/updateCertificateRequest'
+      responses:
+        '204':
+          description: Successful certificate update
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/certificate-mgmt/certificates/{certificateId}/comments':
+    post:
+      tags:
+        - Certificate Management
+      summary: Add comments to certificate
+      description: >-
+        Provides registration capability for adding comments to an existing
+        certificate.
+      operationId: add-comment
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/addCommentRequest'
+      responses:
+        '204':
+          description: Successfully posted comment
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+    get:
+      tags:
+        - Certificate Management
+      summary: Retrieve list of comments
+      description: Provides retrieval capability for returning a certificate comments
+      operationId: get-comments
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/getCommentsResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/certificate-mgmt/certificates/{certificateId}/history':
+    get:
+      tags:
+        - Certificate Management
+      summary: Retrieve certificat history
+      description: >-
+        Provides retrieval capability for returning signing and transaction
+        history of certificate.
+      operationId: get-cert-history
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/getCertHistoryResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/certificate-mgmt/certificates/{certificateId}/signers':
+    post:
+      tags:
+        - Certificate Management
+      summary: Add signer to certificate
+      description: >-
+        Provides registration capability for adding multiple signers to an
+        existing certificate.
+      operationId: add-signer
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/addSignersRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/addSignersResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/certificate-mgmt/certificates/{certificateId}/sign':
+    post:
+      tags:
+        - Certificate Management
+      summary: Sign certificate
+      description: >-
+        Provides signing capability of certificate document(s). AccountId and
+        organizationId is extracted and checked from supplied autorization token.
+      operationId: sign-certificate
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+      responses:
+        '204':
+          description: Certificate document succesfully signed
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/certificate-mgmt/certificates/{certificateId}/documents':
+    post:
+      tags:
+        - Certificate Management
+      summary: Add document to certificate
+      description: >-
+        Provides registration capability for adding a new document  or version
+        to an existing certificate.
+      operationId: add-document
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+      requestBody:
+        $ref: '#/components/requestBodies/addDocumentRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/addDocumentResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/certificate-mgmt/certificates/{certificateId}/documents/{documentId}':
+    get:
+      tags:
+        - Certificate Management
+      summary: Download signed document
+      description: >-
+        Provides retrieval capability for returning a signed certificate / PDF
+        document.
+      operationId: get-document
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+        - $ref: '#/components/parameters/documentIdParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/getDocumentResponse'
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  '/certificate-mgmt/certificates/{certificateId}/documents/{documentId}/revoke':
+    post:
+      tags:
+        - Certificate Management
+      summary: Revoke certificate document
+      description: Provides revoke capability for certificate document.
+      operationId: revoke-document
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/certificateIdParam'
+        - $ref: '#/components/parameters/documentIdParam'
+      responses:
+        '204':
+          description: Certificate document succesfully revoked
+        '400':
+          $ref: '#/components/responses/badRequestError'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  /data-mgmt/statistics:
+    get:
+      tags:
+        - Data management
+      summary: >-
+        Provides retrieval capability for returning statistics of certificates
+        and user accounts.
+      description: Retrieve statistics of the number of certificates and user accounts.
+      operationId: retrieve-statistics
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/statisticsResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+  /verification-mgmt/verify/certificate:
+    post:
+      tags:
+        - Verification Management
+      summary: Verify scanned certificate
+      description: Provides verification capability of scanned certificate.
+      operationId: verify-certificat
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/verifyCertificateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/verifyCertificateResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedError'
+        '403':
+          $ref: '#/components/responses/forbiddenError'
+        '404':
+          $ref: '#/components/responses/notFoundError'
+        '422':
+          $ref: '#/components/responses/unprocessableEntityError'
+        default:
+          $ref: '#/components/responses/internalServerError'
+components:
+  requestBodies:
+    addCommentRequest:
+      description: Add a new comment
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              comment:
+                type: string
+                description: Comment (text) to add
+                minLength: 1
+                example: Typo on lot number
+            required:
+              - comment
+    addDocumentRequest:
+      description: Add a new document
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/documentInitial'
+    addSignersRequest:
+      description: Add new signers
+      content:
+        application/json:
+          schema:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/components/schemas/signer'
+    createOrganizationAccountRequest:
+      description: Create a new organization account
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/accountInitial'
+    createAccountRequest:
+      description: Create a new account
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/accountInitial'
+              - type: object
+                properties:
+                  organization:
+                    $ref: '#/components/schemas/organizationInfo'
+    patchAccountRequest:
+      description: Patch account details
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/accountUpdate'
+    updateAccountRequest:
+      description: Update an existing account
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/account'
+    createOrganizationRequest:
+      description: Create a new organization
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/organizationCreate'
+    patchOrganizationRequest:
+      description: Patch organization details
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/organizationUpdate'
+    updateOrganizationRequest:
+      description: Update an existing organization
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/organization'
+    magicCodeRequest:
+      description: Request Authentication Code
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/codeRequest'
+          examples:
+            emailAddress:
+              value:
+                emailAddress: robert.muster@henkel.de
+    createCertificateRequest:
+      description: Create a new certificate
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/certificateInitial'
+              - type: object
+                properties:
+                  signers:
+                    $ref: '#/components/schemas/signers'
+    updateCertificateRequest:
+      description: Update an existing certificate
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/certificate'
+    verifyCertificateRequest:
+      description: Verify a scanned certificate
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: object
+                properties:
+                  certificateId:
+                    $ref: '#/components/schemas/certificateId'
+                  documentId:
+                    $ref: '#/components/schemas/documentId'
+                  createdAt:
+                    description: Created at unix timestamp
+                    type: integer
+                    format: int64
+                    example: 1640558567
+                  amountOfSigner:
+                    description: The amount of cetificate signers
+                    type: integer
+                    format: int32
+                    example: 2
+                    minimum: 1
+                required:
+                  - certificateId
+                  - documentId
+                  - createdAt
+                  - amountOfSigners
+              - type: object
+                properties:
+                  fileContent:
+                    description: File content of PDF in base64 encoded string
+                    type: string
+                    format: byte
+                required:
+                  - fileContent
+  responses:
+    badRequestError:
+      description: 'Error: Bad request'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/serviceError'
+          example:
+            statusCode: 400
+            name: badRequestError
+            message: The request body is invalid
+    unprocessableEntityError:
+      description: 'Error: Unprocessable Entity'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/serviceError'
+          example:
+            statusCode: 422
+            name: unprocessableEntityError
+            message: The request body is invalid
+            code: VALIDATION_FAILED
+            details:
+              path: .account
+              code: required
+              message: should have required property 'name'
+              missingProperty: name
+    unauthorizedError:
+      description: 'Error: Unauthorized'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/serviceError'
+          example:
+            statusCode: 401
+            name: unauthorizedError
+            message: Missing or bad authentication
+    forbiddenError:
+      description: 'Error: Forbidden'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/serviceError'
+          example:
+            statusCode: 403
+            name: forbiddenError
+            message: No permission to access this resource
+    notFoundError:
+      description: 'Error: Not Found'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/serviceError'
+          example:
+            statusCode: 404
+            name: notFoundError
+            message: Resource XXX not found
+    internalServerError:
+      description: 'Error: Internal Server Error'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/serviceError'
+          example:
+            statusCode: 500
+            name: internalServerError
+            message: Not Implemented
+    addDocumentResponse:
+      description: Successful added document
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/documentResult'
+          examples: {}
+    addSignersResponse:
+      description: Successful document creation
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/accountResult'
+          examples: {}
+    authenticateResponse:
+      description: Successful authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/authResult'
+          examples:
+            internalUser:
+              value:
+                token: >-
+                  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJUcmFjaWZpZXIiLCJzdWIiOiI2MzRhZmFmYWZhMjM0NjJhZmFmYTYyMzU0NjcyYWZhZmE3MjM1YWZhIiwiY3VzIjoiYzA2NzEwMjAxNGIyYTE2MTAzZmRkOTFhNTA2NzJjMTZmODBjYmM5YiIsImRldiI6IjI2NDRiMjUyMDJkMjU2MWQ2MTk0MDc4YTZiNTBkMzM5Iiwicm9sZSI6ImludGVybmFsIiwiaWF0IjoxNjM3ODY5MDAxLCJleHAiOjE2NDc0NjEwMDF9.7ejjxARFQcPcq6Jvfm9_hZxTvr1jvSNQuCeeERsPXWg
+            organizationAdmin:
+              value:
+                token: >-
+                  eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUcmFjaWZpZXIiLCJzdWIiOiIyNDFkMTM3ZTcyMDFmZTFkOTRmY2E3YjllYTAyMWYzZTNmZTA4OTMzIiwiY3VzIjoiMWE1MDY3MmMxNmY4MGNiYzliYzA2NzEwMjAxNGIyYTE2MTAzZmRkOSIsImRldiI6Ijc1YjFkNDYxMjZhNjUwMGI4MWM1MzQ2Njg4MGFhNjU5Iiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNjM3ODY5MDAxLCJleHAiOjE2NDc0NjEwMDF9.lybFYz0zph9r7qJf0_L_lX0nBku7ECeZ3uRDWQzGluA
+            organizationUser:
+              value:
+                token: >-
+                  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJUcmFjaWZpZXIiLCJzdWIiOiJmZWRjYmE5ODc2NTQzMjExMjM0NTY3ODk4NzY1NDMyMTIzNDU2Nzg4IiwiY3VzIjoiMWE1MDY3MmMxNmY4MGNiYzliYzA2NzEwMjAxNGIyYTE2MTAzZmRkOSIsImRldiI6IjRjNmUzNzQ2M2M4ZWRhNmU0OTQ1NDRlYjhiMDI1ZDVmIiwicm9sZSI6InVzZXIiLCJpYXQiOjE2Mzc4NjkwMDEsImV4cCI6MTY0NzQ2MTAwMX0.NWCXIANmetMW5BvppWKrGoe_27f1d_zsKJsBZIz0jAM
+    getCertHistoryResponse:
+      description: Certificate history
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/certificateHistory'
+    createAccountResponse:
+      description: Successful account creation
+      headers:
+        Location:
+          schema:
+            type: string
+            example: /accounts/me
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/accountResult'
+    createOrganizationResponse:
+      description: Successful organization creation
+      headers:
+        Location:
+          schema:
+            type: string
+            example: /organizations/1a50672c16f80cbc9bc067102014b2a16103fdd9
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/organizationResult'
+          examples:
+            henkel:
+              value:
+                organizationId: 1a50672c16f80cbc9bc067102014b2a16103fdd9
+    getAccountResponse:
+      description: Account details
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/account'
+          examples:
+            organizationAccount:
+              value:
+                accountId: 241d137e7201fe1d94fca7b9ea021f3e3fe08933
+                name: Robert Munster
+                emailAddress: robert.muster@henkel.de
+                phoneNumber: '+49625260933'
+                jobPosition: Food importer
+                userRole: user
+                verified: true
+                active: true
+            internalAccount:
+              value:
+                accountId: 634afafafa23462afafa62354672afafa7235afa
+                name: Max Muster
+                emailAddress: max.muster@galab.de
+                phoneNumber: '+491525555019'
+                jobPosition: Galab Admin
+                userRole: internal
+                verified: true
+                active: true
+    getAccountsResponse:
+      description: List of accounts
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              _links:
+                $ref: '#/components/schemas/pageLinks'
+              count:
+                description: Amount of retrieved results
+                type: integer
+                format: int32
+                minimum: 0
+                maximum: 10
+              total:
+                description: Amount of available results
+                type: integer
+                format: int32
+                minimum: 0
+              organization:
+                description: Name of organization
+                type: string
+                example: Henkel
+              accounts:
+                type: array
+                minItems: 1
+                items:
+                  $ref: '#/components/schemas/account'
+            required:
+              - _links
+              - count
+              - total
+          examples:
+            henkelAccountsLast5:
+              value:
+                _links:
+                  self: >-
+                    /organization-mgmt/organizations/1a50672c16f80cbc9bc067102014b2a16103fdd9/accounts/accounts?limit=5&offset=0&filter=desc:createdAt
+                  first: >-
+                    /organization-mgmt/organizations/1a50672c16f80cbc9bc067102014b2a16103fdd9/accounts/accounts?limit=1&offset=0&filter=desc:createdAt
+                  next: >-
+                    /organization-mgmt/organizations/1a50672c16f80cbc9bc067102014b2a16103fdd9/accounts/accounts?limit=5&offset=5&filter=desc:createdAt
+                  last: >-
+                    /organization-mgmt/organizations/1a50672c16f80cbc9bc067102014b2a16103fdd9/accounts/accounts?limit=5&offset=5&filter=desc:createdAt
+                count: 5
+                total: 7
+                organization: Henkel AG & Co
+                accounts:
+                  - accountId: 241d137e7201fe1d94fca7b9ea021f3e3fe08933
+                    name: Robert Munster
+                    emailAddress: robert.munster@henkel.de
+                    phoneNumber: '+49625260933'
+                    jobPosition: Food importer
+                    userRole: admin
+                    verified: true
+                    active: true
+                  - accountId: fedcba9876543211234567898765432123456788
+                    name: Winfried Kiefer
+                    emailAddress: winfried.kiefer@henkel.de
+                    phoneNumber: '+491575556261'
+                    jobPosition: Consultant
+                    userRole: user
+                    verified: true
+                    active: true
+                  - accountId: abcdef1234567891234568887456534523243231
+                    name: Friederic Pfeiffer
+                    emailAddress: friederic.pfeiffer@henkel.de
+                    phoneNumber: '+491515554103'
+                    jobPosition: Food importer
+                    userRole: user
+                    verified: true
+                    active: true
+                  - accountId: deeefa1234567891234568887456534523243235
+                    name: Helene Waltz
+                    emailAddress: helene.waltz@henkel.de
+                    phoneNumber: '+491525551298'
+                    jobPosition: Sales
+                    userRole: signer
+                    verified: true
+                    active: true
+                  - accountId: 765476345afdefafed3534263546235467233562
+                    name: Magdalene Mayer
+                    emailAddress: magdalene.mayar@henkel.de
+                    phoneNumber: '+491635553312'
+                    jobPosition: Sales
+                    userRole: user
+                    verified: true
+                    active: true
+            galabInternalAll:
+              value:
+                _links:
+                  self: >-
+                    /organization-mgmt/organizations/80cbc9bc067102014b2a16103fdd91a50672c16f/accounts
+                  first: >-
+                    /organization-mgmt/organizations/80cbc9bc067102014b2a16103fdd91a50672c16f/accounts?limit=1&offset=0
+                  last: >-
+                    /organization-mgmt/organizations/80cbc9bc067102014b2a16103fdd91a50672c16f/accounts?limit=1&offset=2
+                count: 3
+                total: 3
+                organization: GALAB Laboratories
+                accounts:
+                  - accountId: 634afafafa23462afafa62354672afafa7235afa
+                    name: Max Muster
+                    emailAddress: max.muster@galab.de
+                    phoneNumber: '+491525555019'
+                    jobPosition: Galab Admin
+                    userRole: internal
+                    verified: true
+                    active: true
+                  - accountId: afafa62354672afafa7235afa634afafafa23462
+                    name: Ilma Schneider
+                    emailAddress: ilma.schneider@galab.de
+                    phoneNumber: '+491525558792'
+                    jobPosition: Sales
+                    userRole: internal
+                    verified: true
+                    active: true
+                  - accountId: 62354672afafa7235afa634afafafa23462afafa
+                    name: Karsten Wagner
+                    emailAddress: karsten.wagner@galab.de
+                    phoneNumber: '+491575554429'
+                    jobPosition: Sales
+                    userRole: internal
+                    verified: true
+                    active: true
+    getCommentsResponse:
+      description: List of comments
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/comment'
+    getOrganizationResponse:
+      description: Organization details
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/organization'
+              - type: object
+                properties:
+                  accounts:
+                    description: List of associated accounts
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/account'
+                required:
+                  - accounts
+          examples:
+            henkel:
+              value:
+                organizationId: 1a50672c16f80cbc9bc067102014b2a16103fdd9
+                customerId: GI129851
+                name: Henkel AG & Co
+                picture: >-
+                  iVBORw0KGgoAAAANSUhEUgAAAZUAAAGVCAIAAAC5OftsAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGlmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNy4xLWMwMDAgNzkuZWRhMmIzZiwgMjAyMS8xMS8xNC0xMjozMDo0MiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyMi0wMS0wN1QwOToyMzoyNSswMTowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjk4NTVhN2NkLWRjYzYtNmQ0Yi1hODgwLTBkMGQyNGU0NWRlMSIgeG1wTU06RG9jdW1lbnRJRD0iYWRvYmU6ZG9jaWQ6cGhvdG9zaG9wOmFmNjhmNDc1LTRkNjgtOGM0YS05ZmVhLTRlMzcwZTdjZTY3YyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjE0ZWIxZjM3LTQ5YjUtYTM0YS1hM2QzLTcxYzc5ZmMzYmJlNCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTRlYjFmMzctNDliNS1hMzRhLWEzZDMtNzFjNzlmYzNiYmU0IiBzdEV2dDp3aGVuPSIyMDIyLTAxLTA3VDA5OjIzOjI1KzAxOjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjMuMSAoV2luZG93cykiLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249InNhdmVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOjM4ZGIxYjUyLTUxOGYtOWI0Yy1hMGQxLTZmYjQ2ZDA4NGQ4NyIgc3RFdnQ6d2hlbj0iMjAyMi0wMS0wN1QwOToyNzoxNiswMTowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiBzdEV2dDpjaGFuZ2VkPSIvIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJzYXZlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDo5ODU1YTdjZC1kY2M2LTZkNGItYTg4MC0wZDBkMjRlNDVkZTEiIHN0RXZ0OndoZW49IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkFkb2JlIFBob3Rvc2hvcCAyMy4xIChXaW5kb3dzKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7++wyLAAAFRElEQVR4nO3UQQ0AIBDAMMC/yXOCBz5kSatgr+2ZWQBB53cAwCP/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+g6gIsjQXN8oqKIAAAAABJRU5ErkJggg==
+                address:
+                  streetAddress: Erlengang 31
+                  postalCode: '22844'
+                  city: Norderstedt
+                  country: Germany
+                industryCategory:
+                  - Product Testing
+                contactInfo:
+                  emailAddress: info@henkel.de
+                  phoneNumber: '+494052601100'
+                  faxNumber: '+494052601101'
+                  website: 'https://henkel.de'
+                verified: true
+                active: true
+                accounts:
+                  - accountId: 241d137e7201fe1d94fca7b9ea021f3e3fe08933
+                    name: Robert Munster
+                    emailAddress: robert.munster@henkel.de
+                    phoneNumber: '+49625260933'
+                    jobPosition: Food importer
+                    userRole: admin
+                    verified: true
+                    active: true
+                  - accountId: fedcba9876543211234567898765432123456788
+                    name: Winfried Kiefer
+                    emailAddress: winfried.kiefer@henkel.de
+                    phoneNumber: '+491575556261'
+                    jobPosition: Consultant
+                    userRole: user
+                    verified: true
+                    active: true
+                  - accountId: abcdef1234567891234568887456534523243231
+                    name: Friederic Pfeiffer
+                    emailAddress: friederic.pfeiffer@henkel.de
+                    phoneNumber: '+491515554103'
+                    jobPosition: Food importer
+                    userRole: user
+                    verified: true
+                    active: true
+                  - accountId: deeefa1234567891234568887456534523243235
+                    name: Helene Waltz
+                    emailAddress: helene.waltz@henkel.de
+                    phoneNumber: '+491525551298'
+                    jobPosition: Sales
+                    userRole: signer
+                    verified: true
+                    active: true
+                  - accountId: 765476345afdefafed3534263546235467233562
+                    name: Magdalene Mayer
+                    emailAddress: magdalene.mayar@henkel.de
+                    phoneNumber: '+491635553312'
+                    jobPosition: Sales
+                    userRole: user
+                    verified: true
+                    active: true
+            proctergamble:
+              value:
+                organizationId: c9bc067102014b2a16103fdd91a50672c16f80cb
+                name: Procter & Gamble
+                address:
+                  country: Germany
+                contactInfo:
+                  emailAddress: info@de.pg.com
+                  website: 'https://de.pg.com/'
+                verified: false
+                active: true
+                accounts:
+                  - accountId: 94fca7b9ea021f3e3fe08933241d137e7201fe1d
+                    name: Helfried Müller
+                    emailAddress: hmuller@de.pg.com
+                    phoneNumber: '+49625331011'
+                    jobPosition: Importer
+                    userRole: admin
+                    verified: true
+                    active: true
+    getOrganizationsResponse:
+      description: List of organizations
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              _links:
+                $ref: '#/components/schemas/pageLinks'
+              count:
+                description: Amount of retrieved results
+                type: integer
+                format: int32
+                minimum: 0
+                maximum: 10
+              total:
+                description: Amount of available results
+                type: integer
+                format: int32
+                minimum: 0
+              organizations:
+                type: array
+                minItems: 1
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/organization'
+                    - type: object
+                      properties:
+                        amountOfCertificates:
+                          description: Amount of requested certicates
+                          type: integer
+                          format: int32
+                          minimum: 0
+                          example: 3
+            required:
+              - _links
+              - count
+              - total
+          examples:
+            allOrganizations:
+              value:
+                _links:
+                  self: /organization-mgmt/organizations?offset=0
+                  first: /organization-mgmt/organizations?offset=0
+                  last: /organization-mgmt/organizations?offset=0
+                count: 2
+                total: 2
+                organizations:
+                  - organizationId: 1a50672c16f80cbc9bc067102014b2a16103fdd9
+                    customerId: GI129851
+                    name: Henkel AG & Co
+                    picture: >-
+                      iVBORw0KGgoAAAANSUhEUgAAAZUAAAGVCAIAAAC5OftsAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGlmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNy4xLWMwMDAgNzkuZWRhMmIzZiwgMjAyMS8xMS8xNC0xMjozMDo0MiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyMi0wMS0wN1QwOToyMzoyNSswMTowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjk4NTVhN2NkLWRjYzYtNmQ0Yi1hODgwLTBkMGQyNGU0NWRlMSIgeG1wTU06RG9jdW1lbnRJRD0iYWRvYmU6ZG9jaWQ6cGhvdG9zaG9wOmFmNjhmNDc1LTRkNjgtOGM0YS05ZmVhLTRlMzcwZTdjZTY3YyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjE0ZWIxZjM3LTQ5YjUtYTM0YS1hM2QzLTcxYzc5ZmMzYmJlNCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTRlYjFmMzctNDliNS1hMzRhLWEzZDMtNzFjNzlmYzNiYmU0IiBzdEV2dDp3aGVuPSIyMDIyLTAxLTA3VDA5OjIzOjI1KzAxOjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjMuMSAoV2luZG93cykiLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249InNhdmVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOjM4ZGIxYjUyLTUxOGYtOWI0Yy1hMGQxLTZmYjQ2ZDA4NGQ4NyIgc3RFdnQ6d2hlbj0iMjAyMi0wMS0wN1QwOToyNzoxNiswMTowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiBzdEV2dDpjaGFuZ2VkPSIvIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJzYXZlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDo5ODU1YTdjZC1kY2M2LTZkNGItYTg4MC0wZDBkMjRlNDVkZTEiIHN0RXZ0OndoZW49IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkFkb2JlIFBob3Rvc2hvcCAyMy4xIChXaW5kb3dzKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7++wyLAAAFRElEQVR4nO3UQQ0AIBDAMMC/yXOCBz5kSatgr+2ZWQBB53cAwCP/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+g6gIsjQXN8oqKIAAAAABJRU5ErkJggg==
+                    address:
+                      streetAddress: Erlengang 31
+                      postalCode: '22844'
+                      city: Norderstedt
+                      country: Germany
+                    industryCategory:
+                      - Product Testing
+                    contactInfo:
+                      emailAddress: info@henkel.de
+                      phoneNumber: '+494052601100'
+                      faxNumber: '+494052601101'
+                      website: 'https://henkel.de'
+                    verified: true
+                    active: true
+                    amountOfCertificates: 3
+                  - organizationId: c9bc067102014b2a16103fdd91a50672c16f80cb
+                    name: Procter & Gamble
+                    address:
+                      country: Germany
+                    contactInfo:
+                      emailAddress: info@de.pg.com
+                      website: 'https://de.pg.com/'
+                    verified: false
+                    active: true
+                    amountOfCertificates: 0
+    createCertificateResponse:
+      description: Successful certificate creation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/certificateResult'
+    getCertificateResponse:
+      description: Succesful certificate retrievel
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/certificate'
+              - type: object
+                properties:
+                  signers:
+                    description: List of signers
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/signer'
+                  documents:
+                    description: List of documents
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/document'
+          examples: {}
+    getCertificatesResponse:
+      description: List of certificates
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              _links:
+                $ref: '#/components/schemas/pageLinks'
+              count:
+                type: integer
+                format: int32
+                minimum: 0
+                maximum: 100
+              total:
+                type: integer
+                format: int32
+                minimum: 0
+              certificates:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/certificate'
+                    - type: object
+                      properties:
+                        document:
+                          $ref: '#/components/schemas/document'
+          examples:
+            allCertificates:
+              value:
+                _links:
+                  self: /certificate-mgmt/certificates?limit=5&offset=5
+                  first: /certificate-mgmt/certificates?limit=5&offset=0
+                  prev: /certificate-mgmt/certificates?limit=5&offset=0
+                  next: /certificate-mgmt/certificates?limit=5&offset=10
+                  last: /certificate-mgmt/certificates?limit=5&offset=55
+                count: 0
+                total: 0
+                certificates:
+                  - certificateId: 3ab35386c0c7fe155e93024bf80e3c574c5818b5
+                    organization:
+                      organizationId: 1a50672c16f80cbc9bc067102014b2a16103fdd9
+                      name: Henkel AG & Co
+                      picture: >-
+                        iVBORw0KGgoAAAANSUhEUgAAAZUAAAGVCAIAAAC5OftsAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGlmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNy4xLWMwMDAgNzkuZWRhMmIzZiwgMjAyMS8xMS8xNC0xMjozMDo0MiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyMi0wMS0wN1QwOToyMzoyNSswMTowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjk4NTVhN2NkLWRjYzYtNmQ0Yi1hODgwLTBkMGQyNGU0NWRlMSIgeG1wTU06RG9jdW1lbnRJRD0iYWRvYmU6ZG9jaWQ6cGhvdG9zaG9wOmFmNjhmNDc1LTRkNjgtOGM0YS05ZmVhLTRlMzcwZTdjZTY3YyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjE0ZWIxZjM3LTQ5YjUtYTM0YS1hM2QzLTcxYzc5ZmMzYmJlNCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTRlYjFmMzctNDliNS1hMzRhLWEzZDMtNzFjNzlmYzNiYmU0IiBzdEV2dDp3aGVuPSIyMDIyLTAxLTA3VDA5OjIzOjI1KzAxOjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjMuMSAoV2luZG93cykiLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249InNhdmVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOjM4ZGIxYjUyLTUxOGYtOWI0Yy1hMGQxLTZmYjQ2ZDA4NGQ4NyIgc3RFdnQ6d2hlbj0iMjAyMi0wMS0wN1QwOToyNzoxNiswMTowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiBzdEV2dDpjaGFuZ2VkPSIvIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJzYXZlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDo5ODU1YTdjZC1kY2M2LTZkNGItYTg4MC0wZDBkMjRlNDVkZTEiIHN0RXZ0OndoZW49IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkFkb2JlIFBob3Rvc2hvcCAyMy4xIChXaW5kb3dzKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7++wyLAAAFRElEQVR4nO3UQQ0AIBDAMMC/yXOCBz5kSatgr+2ZWQBB53cAwCP/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+g6gIsjQXN8oqKIAAAAABJRU5ErkJggg==
+                    sampleId: SA11098762
+                    lotNumber: LR102SS9774
+                    product: Coffee
+                    category: Food
+                    requestedBy:
+                      accountId: 241d137e7201fe1d94fca7b9ea021f3e3fe08933
+                      name: Robert Munster
+                      emailAddress: robert.muster@henkel.de
+                    document:
+                      documentId: 59d68b9b058a4c104ceaf596cf6ce4033cc0a7f4
+                      name: 20211113-15267-cert
+                      fileContent: >-
+                        JVBERi0xLjYNJeLjz9MNCjI0IDAgb2JqDTw8L0ZpbHRlci9GbGF0ZURlY29kZS9GaXJzdCA0L0xlbmd0aCAyMTYvTiAxL1R5cGUvT2JqU3RtPj5zdHJlYW0NCmjePI9RS8MwFIX/yn1bi9jepCQ6GYNpFBTEMsW97CVLbjWYNpImmz/fVsXXcw/f/c4SEFarepPTe4iFok8dU09DgtDBQx6TMwT74vaLTE7uSPDUdXM0Xe/73r1FnVwYYEtHR6d9WdY3kX4ipRMV6oojSmxQMoGyac5RLBAXf63p38aGA7XPorLewyvFcYaJile8rB+D/YcwiRdMMGScszO8/IW0MdhsaKKYGA46gXKTr/cUQVY4We/cYMNpnLVeXPJUXHs9fECr7kAFk+eZ5Xr9LcAAfKpQrA0KZW5kc3RyZWFtDWVuZG9iag0yNSAwIG9iag08PC9GaWx0ZXIvRmxhdGVEZWNvZGUvRmlyc3QgNC9MZW5ndGggNDkvTiAxL1R5cGUvT2JqU3RtPj5zdHJlYW0NCmjeslAwULCx0XfOL80rUTDU985MKY42NAIKBsXqh1QWpOoHJKanFtvZAQQYAN/6C60NCmVuZHN0cmVhbQ1lbmRvYmoNMjYgMCBvYmoNPDwvRmlsdGVyL0ZsYXRlRGVjb2RlL0ZpcnN0IDkvTGVuZ3RoIDQyL04gMi9UeXBlL09ialN0bT4+c3RyZWFtDQpo3jJTMFAwVzC0ULCx0fcrzS2OBnENFIJi7eyAIsH6LnZ2AAEGAI2FCDcNCmVuZHN0cmVhbQ1lbmRvYmoNMjcgMCBvYmoNPDwvRmlsdGVyL0ZsYXRlRGVjb2RlL0ZpcnN0IDUvTGVuZ3RoIDEyMC9OIDEvVHlwZS9PYmpTdG0+PnN0cmVhbQ0KaN4yNFIwULCx0XfOzytJzSspVjAyBgoE6TsX5Rc45VdEGwB5ZoZGCuaWRrH6vqkpmYkYogGJRUCdChZgfUGpxfmlRcmpxUAzA4ryk4NTS6L1A1zc9ENSK0pi7ez0g/JLEktSFQz0QyoLUoF601Pt7AACDADYoCeWDQplbmRzdHJlYW0NZW5kb2JqDTIgMCBvYmoNPDwvTGVuZ3RoIDM1MjUvU3VidHlwZS9YTUwvVHlwZS9NZXRhZGF0YT4+c3RyZWFtDQo8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/Pgo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJBZG9iZSBYTVAgQ29yZSA1LjQtYzAwNSA3OC4xNDczMjYsIDIwMTIvMDgvMjMtMTM6MDM6MDMgICAgICAgICI+CiAgIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgICAgIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOnBkZj0iaHR0cDovL25zLmFkb2JlLmNvbS9wZGYvMS4zLyIKICAgICAgICAgICAgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIgogICAgICAgICAgICB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIKICAgICAgICAgICAgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIj4KICAgICAgICAgPHBkZjpQcm9kdWNlcj5BY3JvYmF0IERpc3RpbGxlciA2LjAgKFdpbmRvd3MpPC9wZGY6UHJvZHVjZXI+CiAgICAgICAgIDx4bXA6Q3JlYXRlRGF0ZT4yMDA2LTAzLTA2VDE1OjA2OjMzLTA1OjAwPC94bXA6Q3JlYXRlRGF0ZT4KICAgICAgICAgPHhtcDpDcmVhdG9yVG9vbD5BZG9iZVBTNS5kbGwgVmVyc2lvbiA1LjIuMjwveG1wOkNyZWF0b3JUb29sPgogICAgICAgICA8eG1wOk1vZGlmeURhdGU+MjAxNi0wNy0xNVQxMDoxMjoyMSswODowMDwveG1wOk1vZGlmeURhdGU+CiAgICAgICAgIDx4bXA6TWV0YWRhdGFEYXRlPjIwMTYtMDctMTVUMTA6MTI6MjErMDg6MDA8L3htcDpNZXRhZGF0YURhdGU+CiAgICAgICAgIDx4bXBNTTpEb2N1bWVudElEPnV1aWQ6ZmYzZGNmZDEtMjNmYS00NzZmLTgzOWEtM2U1Y2FlMmRhMmViPC94bXBNTTpEb2N1bWVudElEPgogICAgICAgICA8eG1wTU06SW5zdGFuY2VJRD51dWlkOjM1OTM1MGIzLWFmNDAtNGQ4YS05ZDZjLTAzMTg2YjRmZmIzNjwveG1wTU06SW5zdGFuY2VJRD4KICAgICAgICAgPGRjOmZvcm1hdD5hcHBsaWNhdGlvbi9wZGY8L2RjOmZvcm1hdD4KICAgICAgICAgPGRjOnRpdGxlPgogICAgICAgICAgICA8cmRmOkFsdD4KICAgICAgICAgICAgICAgPHJkZjpsaSB4bWw6bGFuZz0ieC1kZWZhdWx0Ij5CbGFuayBQREYgRG9jdW1lbnQ8L3JkZjpsaT4KICAgICAgICAgICAgPC9yZGY6QWx0PgogICAgICAgICA8L2RjOnRpdGxlPgogICAgICAgICA8ZGM6Y3JlYXRvcj4KICAgICAgICAgICAgPHJkZjpTZXE+CiAgICAgICAgICAgICAgIDxyZGY6bGk+RGVwYXJ0bWVudCBvZiBKdXN0aWNlIChFeGVjdXRpdmUgT2ZmaWNlIG9mIEltbWlncmF0aW9uIFJldmlldyk8L3JkZjpsaT4KICAgICAgICAgICAgPC9yZGY6U2VxPgogICAgICAgICA8L2RjOmNyZWF0b3I+CiAgICAgIDwvcmRmOkRlc2NyaXB0aW9uPgogICA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgCjw/eHBhY2tldCBlbmQ9InciPz4NCmVuZHN0cmVhbQ1lbmRvYmoNMTEgMCBvYmoNPDwvTWV0YWRhdGEgMiAwIFIvUGFnZUxhYmVscyA2IDAgUi9QYWdlcyA4IDAgUi9UeXBlL0NhdGFsb2c+Pg1lbmRvYmoNMjMgMCBvYmoNPDwvRmlsdGVyL0ZsYXRlRGVjb2RlL0xlbmd0aCAxMD4+c3RyZWFtDQpIiQIIMAAAAAABDQplbmRzdHJlYW0NZW5kb2JqDTI4IDAgb2JqDTw8L0RlY29kZVBhcm1zPDwvQ29sdW1ucyA0L1ByZWRpY3RvciAxMj4+L0ZpbHRlci9GbGF0ZURlY29kZS9JRFs8REI3Nzc1Q0NFMjI3RjZCMzBDNDQwREY0MjIxREMzOTA+PEJGQ0NDRjNGNTdGNjEzNEFCRDNDMDRBOUU0Q0ExMDZFPl0vSW5mbyA5IDAgUi9MZW5ndGggODAvUm9vdCAxMSAwIFIvU2l6ZSAyOS9UeXBlL1hSZWYvV1sxIDIgMV0+PnN0cmVhbQ0KaN5iYgACJjDByGzIwPT/73koF0wwMUiBWYxA4v9/EMHA9I/hBVCxoDOQeH8DxH2KrIMIglFwIpD1vh5IMJqBxPpArHYgwd/KABBgAP8bEC0NCmVuZHN0cmVhbQ1lbmRvYmoNc3RhcnR4cmVmDQo0NTc2DQolJUVPRg0K
+                      reportId: RP-SA11098762-1
+                      status: sent
+                      requestedAt: '2021-12-02T20:21:12.020Z'
+                      validUntil: '2022-03-01T00:00:00.000Z'
+    getDocumentResponse:
+      description: Download PDF certificate
+      content:
+        application/pdf:
+          schema:
+            type: string
+            format: binary
+          examples: {}
+    statisticsResponse:
+      description: Successful authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/statistics'
+          examples:
+            internalStatistics:
+              value:
+                certificates:
+                  scanned: 3410
+                  requested: 303
+                  categories:
+                    - name: Food
+                      percentage: 56
+                    - name: Product Testing
+                      percentage: 34
+                    - name: Other
+                      percentage: 10
+                organizations:
+                  totalUsers: 20
+                  locations:
+                    - activeUsers: 4
+                      city: Amsterdam
+                      country: Netherlands
+                    - activeUsers: 10
+                      city: Hamburg
+                      country: Germany
+                    - activeUsers: 6
+                      city: Paris
+                      country: France
+            organizationStatistics:
+              value:
+                certificates:
+                  scanned: 100
+                  requested: 10
+                  categories:
+                    - name: Food
+                      percentage: 60
+                    - name: Product Testing
+                      percentage: 40
+                organizations:
+                  totalUsers: 10
+                  locations:
+                    - activeUsers: 10
+                      city: Hamburg
+                      country: Germany
+    verifyCertificateResponse:
+      description: Certificate verification status
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              isValid:
+                description: Indicates if certificate is valid
+                type: boolean
+                example: true
+              certificate:
+                $ref: '#/components/schemas/certificate'
+            required:
+              - isValid
+  parameters:
+    accountIdParam:
+      name: accountId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/accountId'
+      description: Id of the account
+    codeParam:
+      name: X-Tracifier-Client-Verification
+      in: header
+      description: The auth code value send to user via email
+      required: true
+      schema:
+        type: string
+      example: '361790'
+    organizationIdParam:
+      name: organizationId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/organizationId'
+      description: Id of the organization
+    certificateIdParam:
+      name: certificateId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/certificateId'
+    documentIdParam:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/documentId'
+    offsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      required: false
+      description: The number of items to skip before starting to collect the result set.
+    limitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      required: false
+      description: The number of items to return.
+    filterOnParam:
+      name: filter
+      in: query
+      explode: false
+      schema:
+        type: string
+        pattern: '^[a-zA-Z]+:(?:eq|gt|gte|lt|lte):[a-zA-ZÀ-ž0-9-:.]+$'
+      description: >-
+        The fields to filter result on using format:
+        `fieldname:operator:value`. 
+
+        Separate multiple fiters by a comma.
+
+        |operator|Purpose|
+
+        |--------|-------|
+
+        |eq|Field value equals given value|
+
+        |gt|Field value greater then given value|
+
+        |lt|Field value lesser then given value|
+
+        |gte|Field value greater then / equals given value|
+
+        |lte|Field value lesser then / equals given value|
+      examples:
+        createdAt:
+          value: 'createdAt:gte:2021-12-01T00:00:00Z'
+        organizationId:
+          value: 'organizationId:eq:1a50672c16f80cbc9bc067102014b2a16103fdd9'
+    sortByParam:
+      name: sort
+      in: query
+      explode: false
+      schema:
+        type: string
+        pattern: '^(?:desc|asc):[a-zA-Z]+$'
+      description: |-
+        The fields to sort result by using format: `operator:fieldname`.
+        Separate multiple sort fields by a comma.
+        |operator|Purpose|
+        |--------|-------|
+        |asc|Ascending|
+        |desc|Descending|
+      examples:
+        decending:
+          value: 'desc:createdAt'
+        ascending:
+          value: 'asc:name'
+    signatureParam:
+      name: X-Tracifier-Client-Signature
+      in: header
+      description: Device signature
+      required: true
+      schema:
+        format: byte
+        type: string
+      example: >-
+        eyAiZGV2aWNlSWQiOiAiMmI2ZjBjYzkwNGQxMzdiZTJlMTczMDIzNWY1NjY0MDk0YjgzMTE4NiIgfQ==
+  schemas:
+    serviceError:
+      description: Service error details
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            statusCode:
+              type: integer
+              description: The status code as a number
+              example: 404
+            name:
+              type: string
+              description: >-
+                The name of the error as a "bumpy case", i.e. NotFound or 
+                internalServerError.
+              example: NotFound
+            message:
+              type: string
+              description: >-
+                The traditional error message, which should be kept short and 
+                all single line
+              example: The object you're looking for cannot be found
+            code:
+              type: string
+              description: The application error code
+              example: ENTITY_NOT_FOUND
+            details:
+              type: array
+              items:
+                type: object
+              description: The application error details
+              example:
+                - stacktrace: detailed error trace
+                  linenumber: 203
+          required:
+            - statusCode
+            - name
+    accountInitial:
+      description: Initial account details
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of account
+          example: Robert Munster
+        emailAddress:
+          type: string
+          format: email
+          description: Email address of account
+          example: robert.muster@henkel.de
+        phoneNumber:
+          type: string
+          pattern: '^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$'
+          description: Mobile telephone number of account
+          example: '+49625260933'
+        jobPosition:
+          type: string
+          description: Job position of account holder
+          example: Food importer
+        userRole:
+          $ref: '#/components/schemas/userRole'
+      required:
+        - name
+        - emailAddress
+        - userRole
+    account:
+      description: Account details
+      type: object
+      allOf:
+        - type: object
+          properties:
+            accountId:
+              $ref: '#/components/schemas/accountId'
+          required:
+            - accountId
+        - $ref: '#/components/schemas/accountInitial'
+        - type: object
+          properties:
+            verified:
+              type: boolean
+              description: Indication account is verified
+              example: true
+            active:
+              type: boolean
+              description: Indication account is active
+              example: true
+          required:
+            - verified
+            - active
+    accountUpdate:
+      description: Update account details
+      type: object
+      properties:
+        verified:
+          type: boolean
+          description: Indication account is verified
+          example: true
+        active:
+          type: boolean
+          description: Indication account is active
+          example: true
+    address:
+      description: Address details
+      type: object
+      properties:
+        streetAddress:
+          type: string
+          description: Name and number of street
+          example: Erlengang 31
+        postalCode:
+          type: string
+          description: Postalcode of address
+          example: '22844'
+        city:
+          type: string
+          description: Name of city
+          example: Norderstedt
+        country:
+          type: string
+          description: Country of address
+          example: Germany
+      required:
+        - country
+    assignedAccount:
+      description: Assigned account details
+      type: object
+      properties:
+        accountId:
+          $ref: '#/components/schemas/accountId'
+        name:
+          type: string
+          description: Name of account / user / signer
+          example: Robert Munster
+        emailAddress:
+          type: string
+          format: email
+          description: Email address of signer
+          example: robert.muster@henkel.de
+      required:
+        - accountId
+    assignedOrganization:
+      description: Assigned organization details
+      type: object
+      properties:
+        organizationId:
+          $ref: '#/components/schemas/organizationId'
+        name:
+          type: string
+          description: Name of organization
+          example: Henkel AG & Co
+        picture:
+          type: string
+          format: binary
+          description: Profile picture
+          example: >-
+            iVBORw0KGgoAAAANSUhEUgAAAZUAAAGVCAIAAAC5OftsAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGlmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNy4xLWMwMDAgNzkuZWRhMmIzZiwgMjAyMS8xMS8xNC0xMjozMDo0MiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyMi0wMS0wN1QwOToyMzoyNSswMTowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjk4NTVhN2NkLWRjYzYtNmQ0Yi1hODgwLTBkMGQyNGU0NWRlMSIgeG1wTU06RG9jdW1lbnRJRD0iYWRvYmU6ZG9jaWQ6cGhvdG9zaG9wOmFmNjhmNDc1LTRkNjgtOGM0YS05ZmVhLTRlMzcwZTdjZTY3YyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjE0ZWIxZjM3LTQ5YjUtYTM0YS1hM2QzLTcxYzc5ZmMzYmJlNCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTRlYjFmMzctNDliNS1hMzRhLWEzZDMtNzFjNzlmYzNiYmU0IiBzdEV2dDp3aGVuPSIyMDIyLTAxLTA3VDA5OjIzOjI1KzAxOjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjMuMSAoV2luZG93cykiLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249InNhdmVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOjM4ZGIxYjUyLTUxOGYtOWI0Yy1hMGQxLTZmYjQ2ZDA4NGQ4NyIgc3RFdnQ6d2hlbj0iMjAyMi0wMS0wN1QwOToyNzoxNiswMTowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiBzdEV2dDpjaGFuZ2VkPSIvIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJzYXZlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDo5ODU1YTdjZC1kY2M2LTZkNGItYTg4MC0wZDBkMjRlNDVkZTEiIHN0RXZ0OndoZW49IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkFkb2JlIFBob3Rvc2hvcCAyMy4xIChXaW5kb3dzKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7++wyLAAAFRElEQVR4nO3UQQ0AIBDAMMC/yXOCBz5kSatgr+2ZWQBB53cAwCP/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+g6gIsjQXN8oqKIAAAAABJRU5ErkJggg==
+      required:
+        - organizationId
+    contactInfo:
+      description: Contract info details
+      type: object
+      properties:
+        emailAddress:
+          type: string
+          format: email
+          description: General email address
+          example: info@henkel.de
+        phoneNumber:
+          type: string
+          pattern: '^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$'
+          description: General telephone number
+          example: '+494052601100'
+        faxNumber:
+          type: string
+          pattern: '^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$'
+          description: General fax number
+          example: '+494052601101'
+        website:
+          type: string
+          format: uri
+          description: URL of company website
+          example: 'https://henkel.de'
+      required:
+        - emailAddress
+    comment:
+      description: Comment details
+      type: object
+      properties:
+        commentId:
+          $ref: '#/components/schemas/commentId'
+        comment:
+          type: string
+          description: Comment (text) to add
+          minLength: 1
+      required:
+        - commentId
+        - comment
+    organizationInfo:
+      description: Organization info details
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of organization
+          example: Henkel AG & Co
+        country:
+          type: string
+          description: Name of the country
+          example: Germany
+      required:
+        - name
+        - country
+    organizationInitial:
+      description: Initial organization details
+      type: object
+      properties:
+        customerId:
+          type: string
+          description: External reference of organization
+          example: GI129851
+        name:
+          type: string
+          description: Name of organization
+          example: Henkel AG & Co
+        picture:
+          type: string
+          format: binary
+          description: Profile picture
+          example: >-
+            iVBORw0KGgoAAAANSUhEUgAAAZUAAAGVCAIAAAC5OftsAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGlmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNy4xLWMwMDAgNzkuZWRhMmIzZiwgMjAyMS8xMS8xNC0xMjozMDo0MiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyMi0wMS0wN1QwOToyMzoyNSswMTowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjk4NTVhN2NkLWRjYzYtNmQ0Yi1hODgwLTBkMGQyNGU0NWRlMSIgeG1wTU06RG9jdW1lbnRJRD0iYWRvYmU6ZG9jaWQ6cGhvdG9zaG9wOmFmNjhmNDc1LTRkNjgtOGM0YS05ZmVhLTRlMzcwZTdjZTY3YyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjE0ZWIxZjM3LTQ5YjUtYTM0YS1hM2QzLTcxYzc5ZmMzYmJlNCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTRlYjFmMzctNDliNS1hMzRhLWEzZDMtNzFjNzlmYzNiYmU0IiBzdEV2dDp3aGVuPSIyMDIyLTAxLTA3VDA5OjIzOjI1KzAxOjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjMuMSAoV2luZG93cykiLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249InNhdmVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOjM4ZGIxYjUyLTUxOGYtOWI0Yy1hMGQxLTZmYjQ2ZDA4NGQ4NyIgc3RFdnQ6d2hlbj0iMjAyMi0wMS0wN1QwOToyNzoxNiswMTowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiBzdEV2dDpjaGFuZ2VkPSIvIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJzYXZlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDo5ODU1YTdjZC1kY2M2LTZkNGItYTg4MC0wZDBkMjRlNDVkZTEiIHN0RXZ0OndoZW49IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkFkb2JlIFBob3Rvc2hvcCAyMy4xIChXaW5kb3dzKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7++wyLAAAFRElEQVR4nO3UQQ0AIBDAMMC/yXOCBz5kSatgr+2ZWQBB53cAwCP/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+g6gIsjQXN8oqKIAAAAABJRU5ErkJggg==
+        address:
+          $ref: '#/components/schemas/address'
+        industryCategory:
+          type: array
+          items:
+            type: string
+            description: Industry the company is active in
+            enum:
+              - Food
+              - Product Testing
+              - Other
+            example: Product Testing
+            default: Food
+        contactInfo:
+          $ref: '#/components/schemas/contactInfo'
+      required:
+        - name
+        - address
+        - contactInfo
+    organization:
+      description: Organization details
+      type: object
+      allOf:
+        - type: object
+          properties:
+            organizationId:
+              $ref: '#/components/schemas/organizationId'
+          required:
+            - organizationId
+        - $ref: '#/components/schemas/organizationInitial'
+        - type: object
+          properties:
+            verified:
+              type: boolean
+              description: Indication account is verified
+              example: true
+            active:
+              type: boolean
+              description: Indication account is active
+              example: true
+          required:
+            - verified
+            - active
+    organizationCreate:
+      description: Organization creation details
+      type: object
+      properties:
+        organization:
+          $ref: '#/components/schemas/organizationInitial'
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/accountInitial'
+      required:
+        - organization
+    organizationUpdate:
+      description: Update organization details
+      type: object
+      properties:
+        picture:
+          type: string
+          format: binary
+          description: Profile picture of organization
+          example: >-
+            iVBORw0KGgoAAAANSUhEUgAAAZUAAAGVCAIAAAC5OftsAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGlmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNy4xLWMwMDAgNzkuZWRhMmIzZiwgMjAyMS8xMS8xNC0xMjozMDo0MiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiB4bXA6Q3JlYXRlRGF0ZT0iMjAyMi0wMS0wN1QwOToyMzoyNSswMTowMCIgeG1wOk1vZGlmeURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIGRjOmZvcm1hdD0iaW1hZ2UvcG5nIiBwaG90b3Nob3A6Q29sb3JNb2RlPSIzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjk4NTVhN2NkLWRjYzYtNmQ0Yi1hODgwLTBkMGQyNGU0NWRlMSIgeG1wTU06RG9jdW1lbnRJRD0iYWRvYmU6ZG9jaWQ6cGhvdG9zaG9wOmFmNjhmNDc1LTRkNjgtOGM0YS05ZmVhLTRlMzcwZTdjZTY3YyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjE0ZWIxZjM3LTQ5YjUtYTM0YS1hM2QzLTcxYzc5ZmMzYmJlNCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTRlYjFmMzctNDliNS1hMzRhLWEzZDMtNzFjNzlmYzNiYmU0IiBzdEV2dDp3aGVuPSIyMDIyLTAxLTA3VDA5OjIzOjI1KzAxOjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjMuMSAoV2luZG93cykiLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249InNhdmVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOjM4ZGIxYjUyLTUxOGYtOWI0Yy1hMGQxLTZmYjQ2ZDA4NGQ4NyIgc3RFdnQ6d2hlbj0iMjAyMi0wMS0wN1QwOToyNzoxNiswMTowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDIzLjEgKFdpbmRvd3MpIiBzdEV2dDpjaGFuZ2VkPSIvIi8+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJzYXZlZCIgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDo5ODU1YTdjZC1kY2M2LTZkNGItYTg4MC0wZDBkMjRlNDVkZTEiIHN0RXZ0OndoZW49IjIwMjItMDEtMDlUMjA6NDI6MTArMDE6MDAiIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkFkb2JlIFBob3Rvc2hvcCAyMy4xIChXaW5kb3dzKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7++wyLAAAFRElEQVR4nO3UQQ0AIBDAMMC/yXOCBz5kSatgr+2ZWQBB53cAwCP/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+gyr+AKv8CqvwLqPIvoMq/gCr/Aqr8C6jyL6DKv4Aq/wKq/Auo8i+g6gIsjQXN8oqKIAAAAABJRU5ErkJggg==
+        verified:
+          type: boolean
+          description: Indication organization is verified
+          example: true
+        active:
+          type: boolean
+          description: Indication organization is active
+          example: true
+    accountResult:
+      description: Account result details
+      type: object
+      properties:
+        accountId:
+          $ref: '#/components/schemas/accountId'
+      required:
+        - accountId
+    authResult:
+      description: Authentication result details
+      type: object
+      properties:
+        token:
+          $ref: '#/components/schemas/authToken'
+      required:
+        - token
+    organizationResult:
+      description: Organization result details
+      type: object
+      properties:
+        organizationId:
+          $ref: '#/components/schemas/organizationId'
+      required:
+        - organizationId
+    certificateInitial:
+      description: Initial certificate details
+      type: object
+      properties:
+        organization:
+          $ref: '#/components/schemas/assignedOrganization'
+        sampleId:
+          type: string
+          description: Identification of sample
+          example: SA11098762
+        lotNumber:
+          type: string
+          description: Identification (number) of lot
+          example: LR102SS9774
+        product:
+          type: string
+          description: Name of certified product
+          example: Coffee
+        category:
+          type: string
+          enum:
+            - Food
+            - Product Testing
+            - Other
+          description: Product category
+          example: Food
+          default: Food
+        requestedBy:
+          $ref: '#/components/schemas/assignedAccount'
+      required:
+        - organization
+        - sampleId
+        - product
+        - category
+        - requestedBy
+    certificate:
+      description: Certificate details
+      type: object
+      allOf:
+        - type: object
+          properties:
+            certificateId:
+              $ref: '#/components/schemas/certificateId'
+          required:
+            - certificateId
+        - $ref: '#/components/schemas/certificateInitial'
+    certificateHistory:
+      description: Certificate history details
+      type: object
+      properties:
+        signers:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Name of signer
+                example: Max Muster
+              email:
+                type: string
+                format: email
+                description: Emailaddress of signer
+                example: max.muster@galab.de
+              organization:
+                type: string
+                description: Organization the signer belongs to
+                example: GALAB Laboratories
+              signedOn:
+                type: string
+                format: date-time
+                description: Date and time of signing certificate
+                example: '2021-12-21T07:14:29.196Z'
+            required:
+              - name
+              - email
+              - organization
+              - signedOn
+        transactions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              transactionId:
+                type: string
+                description: Id of transaction (blockchain txID)
+                example: >-
+                  fa0f757bc278fdf6a32d00975602eb853e23a86a156781588d99ddef5b80720f
+              title:
+                type: string
+                description: Title of recorded transaction
+                example: Certificate registered
+              description:
+                type: string
+                description: Description of recorded transaction
+                example: >-
+                  Certificate with sampleId SA11098762 registered on 2021-12-21
+                  at 07:14:11
+            required:
+              - transactionId
+              - title
+              - description
+    certificateResult:
+      description: Certificate result details
+      type: object
+      properties:
+        certificateId:
+          $ref: '#/components/schemas/certificateId'
+      required:
+        - certificateId
+    codeRequest:
+      description: Request for new authorization code
+      oneOf:
+        - type: object
+          properties:
+            emailAddress:
+              type: string
+              format: email
+              description: Email address of account
+              example: robert.muster@henkel.de
+          required:
+            - emailAddress
+        - type: object
+          properties:
+            phoneNumber:
+              type: string
+              pattern: '^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$'
+              description: Phone number of account
+              example: '+494052601100'
+          required:
+            - phoneNumber
+      x-examples:
+        emailAddress:
+          emailAddress: robert.muster@henkel.de
+        phoneNumber:
+          phoneNumber: '+494052601100'
+    document:
+      description: Document details
+      type: object
+      allOf:
+        - type: object
+          properties:
+            documentId:
+              $ref: '#/components/schemas/documentId'
+          required:
+            - documentId
+        - $ref: '#/components/schemas/documentInitial'
+    documentInitial:
+      description: Inital document details
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of document
+          example: 20211113-15267-cert
+        fileContent:
+          type: string
+          format: binary
+          description: Content/preview of uploaded file (required on post operation)
+          example: >-
+            JVBERi0xLjYNJeLjz9MNCjI0IDAgb2JqDTw8L0ZpbHRlci9GbGF0ZURlY29kZS9GaXJzdCA0L0xlbmd0aCAyMTYvTiAxL1R5cGUvT2JqU3RtPj5zdHJlYW0NCmjePI9RS8MwFIX/yn1bi9jepCQ6GYNpFBTEMsW97CVLbjWYNpImmz/fVsXXcw/f/c4SEFarepPTe4iFok8dU09DgtDBQx6TMwT74vaLTE7uSPDUdXM0Xe/73r1FnVwYYEtHR6d9WdY3kX4ipRMV6oojSmxQMoGyac5RLBAXf63p38aGA7XPorLewyvFcYaJile8rB+D/YcwiRdMMGScszO8/IW0MdhsaKKYGA46gXKTr/cUQVY4We/cYMNpnLVeXPJUXHs9fECr7kAFk+eZ5Xr9LcAAfKpQrA0KZW5kc3RyZWFtDWVuZG9iag0yNSAwIG9iag08PC9GaWx0ZXIvRmxhdGVEZWNvZGUvRmlyc3QgNC9MZW5ndGggNDkvTiAxL1R5cGUvT2JqU3RtPj5zdHJlYW0NCmjeslAwULCx0XfOL80rUTDU985MKY42NAIKBsXqh1QWpOoHJKanFtvZAQQYAN/6C60NCmVuZHN0cmVhbQ1lbmRvYmoNMjYgMCBvYmoNPDwvRmlsdGVyL0ZsYXRlRGVjb2RlL0ZpcnN0IDkvTGVuZ3RoIDQyL04gMi9UeXBlL09ialN0bT4+c3RyZWFtDQpo3jJTMFAwVzC0ULCx0fcrzS2OBnENFIJi7eyAIsH6LnZ2AAEGAI2FCDcNCmVuZHN0cmVhbQ1lbmRvYmoNMjcgMCBvYmoNPDwvRmlsdGVyL0ZsYXRlRGVjb2RlL0ZpcnN0IDUvTGVuZ3RoIDEyMC9OIDEvVHlwZS9PYmpTdG0+PnN0cmVhbQ0KaN4yNFIwULCx0XfOzytJzSspVjAyBgoE6TsX5Rc45VdEGwB5ZoZGCuaWRrH6vqkpmYkYogGJRUCdChZgfUGpxfmlRcmpxUAzA4ryk4NTS6L1A1zc9ENSK0pi7ez0g/JLEktSFQz0QyoLUoF601Pt7AACDADYoCeWDQplbmRzdHJlYW0NZW5kb2JqDTIgMCBvYmoNPDwvTGVuZ3RoIDM1MjUvU3VidHlwZS9YTUwvVHlwZS9NZXRhZGF0YT4+c3RyZWFtDQo8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/Pgo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJBZG9iZSBYTVAgQ29yZSA1LjQtYzAwNSA3OC4xNDczMjYsIDIwMTIvMDgvMjMtMTM6MDM6MDMgICAgICAgICI+CiAgIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgICAgIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOnBkZj0iaHR0cDovL25zLmFkb2JlLmNvbS9wZGYvMS4zLyIKICAgICAgICAgICAgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIgogICAgICAgICAgICB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIKICAgICAgICAgICAgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIj4KICAgICAgICAgPHBkZjpQcm9kdWNlcj5BY3JvYmF0IERpc3RpbGxlciA2LjAgKFdpbmRvd3MpPC9wZGY6UHJvZHVjZXI+CiAgICAgICAgIDx4bXA6Q3JlYXRlRGF0ZT4yMDA2LTAzLTA2VDE1OjA2OjMzLTA1OjAwPC94bXA6Q3JlYXRlRGF0ZT4KICAgICAgICAgPHhtcDpDcmVhdG9yVG9vbD5BZG9iZVBTNS5kbGwgVmVyc2lvbiA1LjIuMjwveG1wOkNyZWF0b3JUb29sPgogICAgICAgICA8eG1wOk1vZGlmeURhdGU+MjAxNi0wNy0xNVQxMDoxMjoyMSswODowMDwveG1wOk1vZGlmeURhdGU+CiAgICAgICAgIDx4bXA6TWV0YWRhdGFEYXRlPjIwMTYtMDctMTVUMTA6MTI6MjErMDg6MDA8L3htcDpNZXRhZGF0YURhdGU+CiAgICAgICAgIDx4bXBNTTpEb2N1bWVudElEPnV1aWQ6ZmYzZGNmZDEtMjNmYS00NzZmLTgzOWEtM2U1Y2FlMmRhMmViPC94bXBNTTpEb2N1bWVudElEPgogICAgICAgICA8eG1wTU06SW5zdGFuY2VJRD51dWlkOjM1OTM1MGIzLWFmNDAtNGQ4YS05ZDZjLTAzMTg2YjRmZmIzNjwveG1wTU06SW5zdGFuY2VJRD4KICAgICAgICAgPGRjOmZvcm1hdD5hcHBsaWNhdGlvbi9wZGY8L2RjOmZvcm1hdD4KICAgICAgICAgPGRjOnRpdGxlPgogICAgICAgICAgICA8cmRmOkFsdD4KICAgICAgICAgICAgICAgPHJkZjpsaSB4bWw6bGFuZz0ieC1kZWZhdWx0Ij5CbGFuayBQREYgRG9jdW1lbnQ8L3JkZjpsaT4KICAgICAgICAgICAgPC9yZGY6QWx0PgogICAgICAgICA8L2RjOnRpdGxlPgogICAgICAgICA8ZGM6Y3JlYXRvcj4KICAgICAgICAgICAgPHJkZjpTZXE+CiAgICAgICAgICAgICAgIDxyZGY6bGk+RGVwYXJ0bWVudCBvZiBKdXN0aWNlIChFeGVjdXRpdmUgT2ZmaWNlIG9mIEltbWlncmF0aW9uIFJldmlldyk8L3JkZjpsaT4KICAgICAgICAgICAgPC9yZGY6U2VxPgogICAgICAgICA8L2RjOmNyZWF0b3I+CiAgICAgIDwvcmRmOkRlc2NyaXB0aW9uPgogICA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgCjw/eHBhY2tldCBlbmQ9InciPz4NCmVuZHN0cmVhbQ1lbmRvYmoNMTEgMCBvYmoNPDwvTWV0YWRhdGEgMiAwIFIvUGFnZUxhYmVscyA2IDAgUi9QYWdlcyA4IDAgUi9UeXBlL0NhdGFsb2c+Pg1lbmRvYmoNMjMgMCBvYmoNPDwvRmlsdGVyL0ZsYXRlRGVjb2RlL0xlbmd0aCAxMD4+c3RyZWFtDQpIiQIIMAAAAAABDQplbmRzdHJlYW0NZW5kb2JqDTI4IDAgb2JqDTw8L0RlY29kZVBhcm1zPDwvQ29sdW1ucyA0L1ByZWRpY3RvciAxMj4+L0ZpbHRlci9GbGF0ZURlY29kZS9JRFs8REI3Nzc1Q0NFMjI3RjZCMzBDNDQwREY0MjIxREMzOTA+PEJGQ0NDRjNGNTdGNjEzNEFCRDNDMDRBOUU0Q0ExMDZFPl0vSW5mbyA5IDAgUi9MZW5ndGggODAvUm9vdCAxMSAwIFIvU2l6ZSAyOS9UeXBlL1hSZWYvV1sxIDIgMV0+PnN0cmVhbQ0KaN5iYgACJjDByGzIwPT/73koF0wwMUiBWYxA4v9/EMHA9I/hBVCxoDOQeH8DxH2KrIMIglFwIpD1vh5IMJqBxPpArHYgwd/KABBgAP8bEC0NCmVuZHN0cmVhbQ1lbmRvYmoNc3RhcnR4cmVmDQo0NTc2DQolJUVPRg0K
+        reportId:
+          type: string
+          description: Id of report
+          example: RP-SA11098762-1
+        status:
+          type: string
+          enum:
+            - sent
+            - signed
+            - revoked
+          default: sent
+        requestedAt:
+          type: string
+          format: date-time
+          description: Certificate requested at ISO datetime (default sysdate)
+          example: '2021-12-02T20:21:12.020Z'
+        validUntil:
+          type: string
+          format: date-time
+          description: Certificate valid until ISO datetime (default 3 months)
+          example: '2022-03-01T00:00:00.000Z'
+      required:
+        - name
+        - reportId
+        - status
+    documentResult:
+      description: Document result details
+      type: object
+      properties:
+        documentId:
+          $ref: '#/components/schemas/documentId'
+      required:
+        - documentId
+    signer:
+      description: Signer details
+      type: object
+      properties:
+        accountId:
+          $ref: '#/components/schemas/accountId'
+        name:
+          type: string
+          description: Name of account / user / signer
+          example: Robert Munster
+        emailAddress:
+          type: string
+          format: email
+          description: Email address of signer
+          example: robert.muster@henkel.de
+      required:
+        - name
+        - emailAddress
+    signers:
+      description: List of signers
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/components/schemas/signer'
+      example:
+        - name: Max Muster
+          accountId: 1d94fca7b9ea021f3e3fe08933241d137e7201fe
+          emailAddress: max.muster@galab.de
+        - name: Robert Munster
+          accountId: 241d137e7201fe1d94fca7b9ea021f3e3fe08933
+          emailAddress: robert.muster@henkel.de
+    signature:
+      description: Device signature object structure used in header
+      type: object
+      properties:
+        uniqueId:
+          type: string
+          description: Unique id of device
+          example: 2644b25202d2561d6194078a6b50d339
+        userAgent:
+          type: string
+          description: User agent of browser
+          example: >-
+            Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X)
+            AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143
+        ipAddress:
+          type: string
+          format: ipv4
+          description: IP Address of device
+          example: 89.20.162.146
+      required:
+        - uniqueId
+        - userAgent
+        - ipAddress
+    statistics:
+      description: Statistics details
+      type: object
+      properties:
+        certificates:
+          $ref: '#/components/schemas/statsCertificate'
+        organizations:
+          $ref: '#/components/schemas/statsOrganization'
+    statsCertificate:
+      description: Certificate statistics
+      type: object
+      properties:
+        scanned:
+          type: integer
+          description: Amount of scanned certificates
+          example: 3410
+        requested:
+          type: integer
+          description: Amount of requested certificates
+          example: 303
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/statsCategory'
+          example:
+            - name: Food
+              percentage: 56
+            - name: Product Testing
+              percentage: 44
+      required:
+        - scanned
+        - requested
+    statsOrganization:
+      description: Organization statistics
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+          description: Total amount of users
+          example: 20
+        locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/statsLocation'
+          example:
+            - activeUsers: 4
+              city: Amsterdam
+              country: Netherlands
+            - activeUsers: 10
+              city: Hamburg
+              country: Germany
+            - activeUsers: 6
+              city: Paris
+              country: France
+      required:
+        - totalUsers
+    statsCategory:
+      description: Category statistics
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of category
+          example: Food
+        percentage:
+          type: integer
+          description: Percentage of certificates
+          example: 100
+      x-examples: {}
+    statsLocation:
+      description: Location statistics
+      type: object
+      properties:
+        activeUsers:
+          type: integer
+          description: Amount of active users
+          example: 10
+        city:
+          type: string
+          description: Name of the city
+          example: Hamburg
+        country:
+          type: string
+          description: Name of the country
+          example: Germany
+      required:
+        - activeUsers
+        - city
+        - country
+    pageLinks:
+      description: Links object for pagination of results
+      type: object
+      properties:
+        self:
+          type: string
+          description: URI for retrieving current page
+          example: /certificate-mgmt/certificates?limit=5&offset=5
+          minLength: 1
+        first:
+          type: string
+          description: URI for retrieving first page
+          example: /certificate-mgmt/certificates?limit=5&offset=0
+          minLength: 1
+        prev:
+          type: string
+          description: URI for retrieving prev page
+          example: /certificate-mgmt/certificates?limit=5&offset=0
+          minLength: 1
+        next:
+          type: string
+          description: URI for retrieving next page
+          example: /certificate-mgmt/certificates?limit=5&offset=10
+          minLength: 1
+        last:
+          type: string
+          description: URI for retrieving last page
+          example: /certificate-mgmt/certificates?limit=5&offset=55
+          minLength: 1
+      required:
+        - self
+        - first
+        - last
+    accountId:
+      type: string
+      description: ID of account
+      example: 241d137e7201fe1d94fca7b9ea021f3e3fe08933
+    authToken:
+      type: string
+      description: Authorization token
+      example: >-
+        eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJUcmFjaWZpZXIiLCJzdWIiOiIzYjBiMWM5OTU5MjA5MTFkYjUxZWE1NjUxZjMyMTU3NzUxOGUxMDQxIiwiZGV2IjoiMjVkYWM1ZTNkMDgwNWYzNzQxNjQ4NWJlZmFmNDYxNzIiLCJpYXQiOjE1ODk3MjQ0NjcsImV4cCI6MTYwNTQ0OTI2N30.V_snE6gxU6767TNs15b_k-LTUr0V40I0mpa4BkFlKIw
+    organizationId:
+      type: string
+      pattern: '^[a-f0-9]{40}$'
+      description: ID of organization
+      example: 1a50672c16f80cbc9bc067102014b2a16103fdd9
+    certificateId:
+      type: string
+      pattern: '^[a-f0-9]{40}$'
+      description: ID of certificate
+      example: 3ab35386c0c7fe155e93024bf80e3c574c5818b5
+    commentId:
+      type: string
+      pattern: '^[a-f0-9]{40}$'
+      description: ID of comment
+      example: 86c0c7fe155e93024bf80e3c574c5818b53ab353
+    documentId:
+      type: string
+      pattern: '^[a-f0-9]{40}$'
+      description: ID of document
+      example: 59d68b9b058a4c104ceaf596cf6ce4033cc0a7f4
+    userRole:
+      type: string
+      description: User role enumation
+      enum:
+        - internal
+        - admin
+        - user
+        - signer
+        - reader
+      default: reader
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Tracifier-Client-Auth
+      description: API key of client application
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Authorization token

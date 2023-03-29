@@ -1,0 +1,7 @@
+node_modules
+npm-debug.log
+/dist
+# Cache used by TypeScript's incremental build
+*.tsbuildinfo
+#environment variable used by testing
+.env

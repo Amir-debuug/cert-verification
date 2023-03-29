@@ -1,0 +1,144 @@
+openapi: 3.0.0
+info:
+  title: Tracifier Blockchain API
+  description: Blockchain API REST proxy
+  version: 1.0.0
+  termsOfService: 'https://tracifier.com/terms/'
+  contact:
+    email: info@tracifier.com
+    name: Tracifier API Team
+    url: 'https://tracifier.com'
+  license:
+    name: Licence usage - Apache 2.0
+    url: 'https://www.apache.cus/licenses/LICENSE-2.0.html'
+servers:
+  - description: QA Environment
+    url: >-
+      https://galabqa-2-galabhh-fra.blockchain.ocp.oraclecloud.com:7443/restproxy/api/v2
+tags:
+  - name: Channel Management
+    description: Resources in this group are related to channel management.
+paths:
+  '/channels/{channel}/transactions':
+    post:
+      tags:
+        - Channel Management
+      summary: Invoke a transaction
+      description: Invoke a transaction on a channel
+      operationId: invoke-transaction
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/channelParam'
+      requestBody:
+        $ref: '#/components/requestBodies/invocationRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/invocationResponse'
+        '400':
+          $ref: '#/components/responses/invocationResponse'
+  '/channels/{channel}/chaincode-queries':
+    post:
+      tags:
+        - Channel Management
+      summary: Invoke a query
+      description: Invoke a query on a channel
+      operationId: invoke-query
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/channelParam'
+      requestBody:
+        $ref: '#/components/requestBodies/invocationRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/invocationResponse'
+        '400':
+          $ref: '#/components/responses/invocationResponse'
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+  parameters:
+    channelParam:
+      name: channel
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/channelName'
+      description: Name of channel
+  requestBodies:
+    invocationRequest:
+      description: Invoke a transaction
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/invocation'
+  responses:
+    invocationResponse:
+      description: Invocation result
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/invocationResult'
+  schemas:
+    invocation:
+      title: Invocation
+      description: Details of invocation transaction
+      type: object
+      properties:
+        chaincode:
+          type: string
+          minLength: 3
+          example: CertificateCC
+        args:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        transientMap:
+          type: object
+          properties:
+            param0:
+              type: string
+        timeout:
+          type: integer
+          default: 60000
+        sync:
+          type: boolean
+          default: true
+      required:
+        - chaincode
+        - args
+        - timeout
+        - sync
+    invocationResult:
+      type: object
+      properties:
+        returnCode:
+          type: string
+          enum:
+            - Success
+            - Failure
+        error:
+          type: string
+        result:
+          $ref: '#/components/schemas/result'
+      required:
+        - returnCode
+        - error
+    result:
+      type: object
+      properties:
+        txid:
+          type: string
+        payload:
+          anyOf:
+            - type: string
+            - type: object
+        encode:
+          type: string
+    channelName:
+      type: string
+      example: certificate-dev

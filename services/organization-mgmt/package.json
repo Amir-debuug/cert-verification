@@ -1,0 +1,85 @@
+{
+  "name": "@tracifier/service-organization-mgmt",
+  "version": "1.1.0",
+  "description": "Tracifier backend service for organization management",
+  "keywords": [
+    "loopback",
+    "tracifier",
+    "organizations"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": "12 || 14 || 16 || 17"
+  },
+  "scripts": {
+    "build": "lb-tsc",
+    "build:watch": "lb-tsc --watch",
+    "lint": "npm run eslint && npm run prettier:check",
+    "lint:fix": "npm run eslint:fix && npm run prettier:fix",
+    "prettier:cli": "lb-prettier \"**/*.ts\" \"**/*.js\"",
+    "prettier:check": "npm run prettier:cli -- -l",
+    "prettier:fix": "npm run prettier:cli -- --write",
+    "eslint": "lb-eslint --report-unused-disable-directives .",
+    "eslint:fix": "npm run eslint -- --fix",
+    "pretest": "npm run rebuild",
+    "test": "lb-mocha --allow-console-logs \"dist/__tests__\"",
+    "posttest": "npm run lint",
+    "test:dev": "lb-mocha --allow-console-logs dist/__tests__/**/*.js && npm run posttest",
+    "docker:build": "docker build -t tracifier-organization-mgmt .",
+    "docker:run": "docker run -p 8081:8081 -d tracifier-organization-mgmt",
+    "premigrate": "npm run build",
+    "migrate": "node ./dist/migrate",
+    "preopenapi-spec": "npm run build",
+    "openapi-spec": "node ./dist/openapi-spec",
+    "prestart": "npm run rebuild",
+    "start": "node -r source-map-support/register .",
+    "clean": "lb-clean dist *.tsbuildinfo .eslintcache",
+    "rebuild": "npm run clean && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "author": "Tracifier team: <backend@tracifier.com>",
+  "license": "MPL-2.0",
+  "files": [
+    "README.md",
+    "dist",
+    "src",
+    "!*/__tests__"
+  ],
+  "dependencies": {
+    "@loopback/authentication": "^8.0.1",
+    "@loopback/authentication-jwt": "^0.10.1",
+    "@loopback/boot": "^4.0.1",
+    "@loopback/core": "^3.0.1",
+    "@loopback/repository": "^4.0.1",
+    "@loopback/rest": "^11.0.1",
+    "@loopback/rest-explorer": "^4.0.1",
+    "@loopback/service-proxy": "^4.0.1",
+    "@sentry/node": "^6.17.3",
+    "@sentry/tracing": "^6.17.3",
+    "aws-sdk": "^2.1325.0",
+    "dotenv": "^14.2.0",
+    "js-base64": "^3.7.2",
+    "loopback-connector-mongodb": "^6.1.0",
+    "loopback-connector-openapi": "^6.2.0",
+    "loopback-connector-oracle": "^4.5.2",
+    "nodemailer": "^6.7.2",
+    "oracledb": "^5.3.0",
+    "tslib": "^2.0.0",
+    "ua-parser-js": "^1.0.2"
+  },
+  "devDependencies": {
+    "@loopback/build": "^8.0.1",
+    "@loopback/eslint-config": "^12.0.1",
+    "@loopback/testlab": "^4.0.1",
+    "@types/mocha": "^9.0.0",
+    "@types/node": "^10.17.60",
+    "@types/ua-parser-js": "^0.7.36",
+    "eslint": "^8.6.0",
+    "source-map-support": "^0.5.21",
+    "typescript": "~4.5.4"
+  }
+}

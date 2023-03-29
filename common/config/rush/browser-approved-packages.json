@@ -1,0 +1,118 @@
+// DO NOT ADD COMMENTS IN THIS FILE.  They will be lost when the Rush tool resaves it.
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/rush/v5/approved-packages.schema.json",
+  "packages": [
+    {
+      "name": "@loopback/authentication",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/authentication-jwt",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/boot",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/build",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/core",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/eslint-config",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/repository",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/rest",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/rest-explorer",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/service-proxy",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@loopback/testlab",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@sentry/node",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@sentry/tracing",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@types/mocha",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@types/node",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "@types/ua-parser-js",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "dotenv",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "eslint",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "js-base64",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "loopback-connector-mongodb",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "loopback-connector-openapi",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "loopback-connector-oracle",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "nodemailer",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "oracledb",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "source-map-support",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "tslib",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "typescript",
+      "allowedCategories": [ "production" ]
+    },
+    {
+      "name": "ua-parser-js",
+      "allowedCategories": [ "production" ]
+    }
+  ]
+}

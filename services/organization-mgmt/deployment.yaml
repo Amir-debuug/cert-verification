@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracifier-organization-mgmt
+spec:
+  selector:
+    matchLabels:
+      app: organization
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: organization
+    spec:
+      containers:
+        - name: organization
+          image: fra.ocir.io/frh0kfhfretq/backend/tracifier-organization-mgmt:1.1.0
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: tracifier-config-v2
+          ports:
+            - name: organization
+              containerPort: 3000
+              protocol: TCP
+      imagePullSecrets:
+        - name: ocirsecret
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tracifier-config-v2
+  labels:
+    app: tracifier
+data:
+  SMTP_HOST: smtp.email.eu-frankfurt-1.oci.oraclecloud.com
+  SMTP_PORT: '587'
+  SMTP_USER: ocid1.user.oc1..aaaaaaaazyvyqrkzcab2llrljaz3ey4rcrxmmv6fjn6flajal6lb6crbo2sa@ocid1.tenancy.oc1..aaaaaaaatkokntog7rgrxjwnau77gtc6cepvvva6vfusknwfjw7nvq5jqfqa.9s.com
+  SMTP_PASS: yB-+sC0YCU>89DWiZCd3
+  EMAIL_NOREPLY: noreply@galab.de
+  TLS_ON: 'false'
+  TOKEN_SECRET: jwtS3cr3t
+  TOKEN_EXPIRE: '15724800'
+  MONGODB_URL: mongodb://tracifier:Tr4c1fier01!@G7474546A23270F-TRACIFIER.adb.eu-frankfurt-1.oraclecloudapps.com:27016/tracifier?authMechanism=PLAIN&authSource=$external&ssl=true&retryWrites=false
+  SENTRY_DSN: https://af87b1cfa97a4a39a95ee50004f4aac1@o1133005.ingest.sentry.io/6179138
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracifier-organization-mgmt-lb
+  labels:
+    app: organization
+  annotations:
+    service.beta.kubernetes.io/oci-load-balancer-shape: 'flexible'
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: '10'
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: '100'
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8080
+      targetPort: 3000
+  selector:
+    app: organization
